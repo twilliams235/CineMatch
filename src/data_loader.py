@@ -5,8 +5,8 @@ DATASET_PATH = "/Users/tylerwilliams/.cache/kagglehub/datasets/grouplens/moviele
 
 def load_data():
     """Loads and preprocesses the MovieLens dataset."""
-    ratings = pd.read_csv(f"{DATASET_PATH}/ratings.csv")
-    movies = pd.read_csv(f"{DATASET_PATH}/movies.csv")
+    ratings = pd.read_csv(f"{DATASET_PATH}/rating.csv")
+    movies = pd.read_csv(f"{DATASET_PATH}/movie.csv")
 
     # Create mappings for user and movie indices
     user_ids = ratings["userId"].unique()

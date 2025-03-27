@@ -1,4 +1,5 @@
 import torch
+import os
 import pandas as pd
 from src.data_loader import load_data
 from src.model import RecommenderNN
@@ -10,8 +11,14 @@ ratings, movies, user_to_index, movie_to_index = load_data()
 num_users = len(user_to_index)
 num_movies = len(movie_to_index)
 model = RecommenderNN(num_users, num_movies)
-model.load_state_dict(torch.load("models/trained_model.pth"))
-model.eval()
+
+# Check if the trained model exists before loading
+model_path = "models/trained_model.pth"
+
+if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
+    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+    model.eval()
+
 
 def recommend_movies(user_movie_ids, user_ratings, top_n=5):
     """
