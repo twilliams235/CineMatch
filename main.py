@@ -12,14 +12,15 @@ def main():
         train_model()
 
     elif args.recommend:
-        print("Enter watched movie IDs (comma-separated): ")
-        watched_movies = list(map(int, input().split(",")))
-        print("Enter ratings for those movies (comma-separated): ")
-        given_ratings = list(map(float, input().split(",")))
-
-        recommendations = recommend_movies(watched_movies, given_ratings)
+        print("Enter your movie ratings in the format: movieId:rating, separated by commas.")
+        print("Example: 1:4.5, 50:3.0, 100:5.0")
+        input_ratings = input("Enter your ratings: ")
+        
+        recommendations = recommend_movies(input_ratings)
+        
         print("\nTop 5 Recommended Movies:")
-        print(recommendations)
+        for idx, movie in enumerate(recommendations, start=1):
+            print(f"{idx}. {movie}")
 
     else:
         print("Use --train to train the model or --recommend to get recommendations.")

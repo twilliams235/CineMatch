@@ -20,22 +20,36 @@ if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
     model.eval()
 
 
-def recommend_movies(user_movie_ids, user_ratings, top_n=5):
+def recommend_movies(input_ratings, top_n=5):
     """
     Given a user’s watched movies and ratings, predict ratings for all movies and return top recommendations.
     """
-    user_idx = 0
+    input_pairs = [pair.split(":") for pair in input_ratings.split(",")]
+    input_pairs = [(int(movie), float(rating)) for movie, rating in input_pairs]
 
-    all_movies = pd.DataFrame({"movieId": list(movie_to_index.keys()), "movie_index": list(movie_to_index.values())})
-    movie_indices = torch.tensor(all_movies["movie_index"].values, dtype=torch.long)
-    user_tensor = torch.full((len(movie_indices),), user_idx, dtype=torch.long)
+    # Convert movie IDs to indexes
+    movie_indexes = [movie_to_index[movie] for movie, _ in input_pairs if movie in movie_to_index]
+    movie_ratings = torch.tensor([rating for _, rating in input_pairs], dtype=torch.float32)
 
-    with torch.no_grad():
-        predicted_ratings = model(user_tensor, movie_indices).squeeze().numpy()
+    # Ensure there are valid movies
+    if not movie_indexes:
+        print("No valid movies found in input!")
+        return []
 
-    all_movies["predicted_rating"] = predicted_ratings
-    unwatched_movies = all_movies[~all_movies["movieId"].isin(user_movie_ids)]
-    top_movies = unwatched_movies.sort_values(by="predicted_rating", ascending=False).head(top_n)
-    top_movies = top_movies.merge(movies, on="movieId")[["movieId", "title", "predicted_rating"]]
+    # Extract the learned movie embeddings from the model
+    movie_embeddings = model.movie_embedding.weight[movie_indexes]
 
-    return top_movies
+    # Aggregate the embeddings (e.g., weighted average by ratings)
+    user_embedding = torch.sum(movie_embeddings * movie_ratings.view(-1, 1), dim=0) / torch.sum(movie_ratings)
+
+    # Predict scores for all movies
+    all_movie_ids = list(movie_to_index.values())
+    all_movie_embeddings = model.movie_embedding.weight[all_movie_ids]
+
+    scores = torch.matmul(all_movie_embeddings, user_embedding)
+
+    # Get top N recommended movies
+    topN_indices = torch.argsort(scores, descending=True)[:top_n]
+    recommended_movies = [movies.iloc[idx]["title"] for idx in topN_indices.numpy()]
+
+    return recommended_movies

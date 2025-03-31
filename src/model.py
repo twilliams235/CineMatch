@@ -8,8 +8,9 @@ from src.data_loader import load_data
 # Load Data
 ratings, movies, user_to_index, movie_to_index = load_data()
 
-# Train-test split
-train, test = train_test_split(ratings, test_size=0.2, random_state=42)
+# Train-validation-test split
+train_data, temp_data = train_test_split(ratings, test_size=0.3, random_state=42)
+val_data, test_data = train_test_split(temp_data, test_size=0.5, random_state=42)
 
 # Define PyTorch Dataset Class
 class MovieDataset(Dataset):
@@ -25,8 +26,9 @@ class MovieDataset(Dataset):
         return self.users[idx], self.movies[idx], self.ratings[idx]
 
 # Loaders
-train_loader = DataLoader(MovieDataset(train), batch_size=256, shuffle=True)
-test_loader = DataLoader(MovieDataset(test), batch_size=256)
+train_loader = DataLoader(MovieDataset(train_data), batch_size=256, shuffle=True)
+val_loader = DataLoader(MovieDataset(val_data), batch_size=256)
+test_loader = DataLoader(MovieDataset(test_data), batch_size=256)
 
 # Define PyTorch Model
 class RecommenderNN(nn.Module):
@@ -68,10 +70,27 @@ def train_model(epochs=5, lr=0.001):
             epoch_loss += loss.item()
 
         print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss/len(train_loader)}")
-
+    
+    print("Training complete. Evaluating on validation set...")
+    validate_model()
+    
     # Save model
     torch.save(model.state_dict(), "models/trained_model.pth")
     print("Model training complete & saved!")
 
+# Validation Function
+def validate_model():
+    model.eval()
+    val_loss = 0
+    criterion = nn.MSELoss()
+    with torch.no_grad():
+        for users, movies, ratings in val_loader:
+            predictions = model(users, movies).squeeze()
+            loss = criterion(predictions, ratings)
+            val_loss += loss.item()
+    
+    print(f"Validation MSE Loss: {val_loss/len(val_loader)}")
+
 if __name__ == "__main__":
     train_model()
+
