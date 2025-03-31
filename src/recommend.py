@@ -24,7 +24,7 @@ def recommend_movies(user_movie_ids, user_ratings, top_n=5):
     """
     Given a user’s watched movies and ratings, predict ratings for all movies and return top recommendations.
     """
-    user_idx = max(user_to_index.values()) + 1
+    user_idx = 0
 
     all_movies = pd.DataFrame({"movieId": list(movie_to_index.keys()), "movie_index": list(movie_to_index.values())})
     movie_indices = torch.tensor(all_movies["movie_index"].values, dtype=torch.long)
