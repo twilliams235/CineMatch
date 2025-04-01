@@ -53,7 +53,7 @@ def evaluate_user_preference(k=10):
             top_k_actual = torch.argsort(eval_ratings, descending=True)[:k]
 
             correct_predictions += len(set(top_k_predicted.tolist()) & set(top_k_actual.tolist()))
-            total_users += len(eval_movies)
+            total_users += k
 
     top_k_accuracy = correct_predictions / total_users if total_users > 0 else 0
     print(f"Top-{k} Accuracy: {top_k_accuracy:.4f}")

@@ -36,6 +36,8 @@ class RecommenderNN(nn.Module):
         super(RecommenderNN, self).__init__()
         self.user_embedding = nn.Embedding(num_users, embedding_dim)
         self.movie_embedding = nn.Embedding(num_movies, embedding_dim)
+        self.user_bias = nn.Embedding(num_users, 1)
+        self.movie_bias = nn.Embedding(num_movies, 1)
         self.fc1 = nn.Linear(embedding_dim * 2, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 1)
@@ -46,7 +48,8 @@ class RecommenderNN(nn.Module):
         x = torch.cat([user_embedded, movie_embedded], dim=1)
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        return self.fc3(x)
+        return self.fc3(x).squeeze() + self.user_bias(user).squeeze() + self.movie_bias(movie).squeeze()
+
 
 # Initialize Model
 num_users = len(user_to_index)
@@ -54,7 +57,7 @@ num_movies = len(movie_to_index)
 model = RecommenderNN(num_users, num_movies)
 
 # Training Function
-def train_model(epochs=5, lr=0.001):
+def train_model(epochs=10, lr=0.0005, weight_decay=1e-5):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
