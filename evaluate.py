@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.data_loader import load_data
-from src.model import RecommenderNN
+from src.model import RecommenderNN_BPR
 
 def evaluate_user_preference(k=10):
     """Evaluates the model by splitting user test data and ranking remaining movies."""
@@ -13,8 +13,8 @@ def evaluate_user_preference(k=10):
     ratings, movies, user_to_index, movie_to_index = load_data()
 
     # Load Trained Model
-    model = RecommenderNN(num_users=len(user_to_index), num_movies=len(movie_to_index))
-    model.load_state_dict(torch.load("models/trained_model.pth"))
+    model = RecommenderNN_BPR(num_users=len(user_to_index), num_movies=len(movie_to_index))
+    model.load_state_dict(torch.load("models/trained_model_bpr.pth"))
     model.eval()
 
     # Prepare test data
@@ -27,6 +27,8 @@ def evaluate_user_preference(k=10):
         for user in test_users:
             user_data = test_data[test_data["user_index"] == user]
             if len(user_data) < 30:
+                continue  # Skip users with too few ratings
+            if len(user_data) > 100:
                 continue  # Skip users with too few ratings
 
             # Split user's data in half into input movies and evaluation movies
@@ -53,7 +55,7 @@ def evaluate_user_preference(k=10):
             top_k_actual = torch.argsort(eval_ratings, descending=True)[:k]
 
             correct_predictions += len(set(top_k_predicted.tolist()) & set(top_k_actual.tolist()))
-            total_users += k
+            total_users += len(eval_movies)
 
     top_k_accuracy = correct_predictions / total_users if total_users > 0 else 0
     print(f"Top-{k} Accuracy: {top_k_accuracy:.4f}")

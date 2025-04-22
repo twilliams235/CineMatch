@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.data_loader import load_data
 from src.recommend import recommend_movies
-from src.model import RecommenderNN
+from src.model import RecommenderNN_BPR
 import os
 
 def precision_at_k(recommended, relevant, k):
@@ -12,17 +12,17 @@ def precision_at_k(recommended, relevant, k):
     hit_count = sum(1 for movie in recommended_k if movie in relevant_set)
     return hit_count / k
 
-def evaluate_precision_at_k(k=5):
+def evaluate_precision_at_k(k=10):
     """Evaluate Precision@K using recommend_movies."""
     ratings, movies, user_to_index, movie_to_index = load_data()
 
     # Load trained model
-    model_path = "models/trained_model.pth"
+    model_path = "models/trained_model_bpr.pth"
     if not os.path.exists(model_path):
         print("Trained model not found. Please train the model first.")
         return
 
-    model = RecommenderNN(num_users=len(user_to_index), num_movies=len(movie_to_index))
+    model = RecommenderNN_BPR(num_users=len(user_to_index), num_movies=len(movie_to_index))
     model.load_state_dict(torch.load(model_path, map_location="cpu"))
     model.eval()
 
@@ -33,7 +33,7 @@ def evaluate_precision_at_k(k=5):
 
     for user in test_users:
         user_data = test_data[test_data["user_index"] == user]
-        if len(user_data) < 25:
+        if len(user_data) < 30 or len(user_data) > 300:
             continue  # Skip users with too few ratings
 
         # Shuffle and split into input and evaluation sets
@@ -47,7 +47,7 @@ def evaluate_precision_at_k(k=5):
             for i in input_df.index
         )
 
-        recommended_titles = recommend_movies(input_ratings_str, top_n=k)
+        recommended_titles = recommend_movies(input_ratings_str, top_k=k)
 
         # Change 3.0 if we want a lower precision
         liked_eval_df = eval_df[eval_df["rating"] >= 3.0]

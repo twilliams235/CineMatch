@@ -2,25 +2,27 @@ import torch
 import os
 import pandas as pd
 from src.data_loader import load_data
-from src.model import RecommenderNN
+from src.model import RecommenderNN_BPR
 
 # Load Data
 ratings, movies, user_to_index, movie_to_index = load_data()
+index_to_movie_id = {v: k for k, v in movie_to_index.items()}
 
 # Load Trained Model
 num_users = len(user_to_index)
 num_movies = len(movie_to_index)
-model = RecommenderNN(num_users, num_movies)
+
+model = RecommenderNN_BPR(num_users, num_movies)
 
 # Check if the trained model exists before loading
-model_path = "models/trained_model.pth"
+model_path = "models/trained_model_bpr.pth"
 
 if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
     model.load_state_dict(torch.load(model_path, map_location="cpu"))
     model.eval()
 
 
-def recommend_movies(input_ratings, top_n=5):
+def recommend_movies(input_ratings, top_k=5, genre_filter=None):
     """
     Given a user’s watched movies and ratings, predict ratings for all movies and return top recommendations.
     """
@@ -43,13 +45,34 @@ def recommend_movies(input_ratings, top_n=5):
     user_embedding = torch.sum(movie_embeddings * movie_ratings.view(-1, 1), dim=0) / torch.sum(movie_ratings)
 
     # Predict scores for all movies
-    all_movie_ids = list(movie_to_index.values())
-    all_movie_embeddings = model.movie_embedding.weight[all_movie_ids]
+    # all_movie_ids = list(movie_to_index.values())
+    all_movie_embeddings = model.movie_embedding.weight # [all_movie_ids]
 
     scores = torch.matmul(all_movie_embeddings, user_embedding)
 
     # Get top N recommended movies
-    topN_indices = torch.argsort(scores, descending=True)[:top_n]
-    recommended_movies = [movies.iloc[idx]["title"] for idx in topN_indices.numpy()]
+    # topN_indices = torch.argsort(scores, descending=True)[:top_n]
+    # recommended_movies = [movies.iloc[idx]["title"] for idx in topN_indices.numpy()]
+    # Convert scores to numpy and get sorted indices
+    sorted_indices = torch.argsort(scores, descending=True)
+
+    recommended_movies = []
+
+    for idx in sorted_indices:
+        if idx in movie_indexes:
+            continue  # Skip already-rated movies
+
+        movie_id = index_to_movie_id[int(idx)]
+        movie_row = movies[movies["movieId"] == movie_id].iloc[0]
+        title = movie_row["title"]
+        genres = str(movie_row["genres"]).split("|")
+
+        if genre_filter:
+            if genre_filter.lower() not in [g.lower() for g in genres]:
+                continue
+
+        recommended_movies.append(title)
+        if len(recommended_movies) == top_k:
+            break
 
     return recommended_movies
