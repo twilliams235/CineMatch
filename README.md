@@ -23,9 +23,12 @@ src/
 - model.py # BPR-based recommender model + training loop
 - recommend.py # Movie recommendation logic
 - data_loader.py # Data loading, preprocessing, and genre utilities
+
 models/
 - trained_model_bpr.pth # Saved trained model (after training)
+
 main.py # CLI entry point
+
 README.md
 
 
@@ -47,8 +50,10 @@ Run:
 ## Getting Recommendations
 Run:
     ```python -m src.main --recommend --top_k 5 --genre Comedy```
+
 You’ll be prompted to enter your watched movies and ratings in the format:
     1:4.5, 50:3.0, 100:5.0
+
 The system will:
 - Build a user embedding from your rated movies
 - Recommend Top-K movies you haven’t rated yet
