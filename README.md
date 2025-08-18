@@ -19,15 +19,14 @@ It leverages **Bayesian Personalized Ranking (BPR)** with implicit feedback to g
 ---
 
 ## Project Structure
-├── src/
-│ ├── model.py # BPR-based recommender model + training loop
-│ ├── recommend.py # Movie recommendation logic
-│ └──  data_loader.py # Data loading, preprocessing, and genre utilities
-│ 
-├── models/
-│ └── trained_model_bpr.pth # Saved trained model (after training)
-├── main.py # CLI entry point
-└── README.md
+src/
+- model.py # BPR-based recommender model + training loop
+- recommend.py # Movie recommendation logic
+- data_loader.py # Data loading, preprocessing, and genre utilities
+models/
+- trained_model_bpr.pth # Saved trained model (after training)
+main.py # CLI entry point
+README.md
 
 
 ## Installation
