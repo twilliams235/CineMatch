@@ -1,55 +1,86 @@
-import torch
 import os
+import torch
 import pandas as pd
+from typing import List
 from src.data_loader import load_data
 from src.model import RecommenderNN
 
-# Load Data
+# Load Data & Model
 ratings, movies, user_to_index, movie_to_index = load_data()
-
-# Load Trained Model
 num_users = len(user_to_index)
 num_movies = len(movie_to_index)
+
 model = RecommenderNN(num_users, num_movies)
 
-# Check if the trained model exists before loading
-model_path = "models/trained_model.pth"
 
-if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
-    model.eval()
+def _safe_movie_index(mid: int):
+    return movie_to_index[mid] if mid in movie_to_index else None
 
-
-def recommend_movies(input_ratings, top_n=5):
+def recommend_movies(input_ratings: str, recommend_model: str, top_n: int = 5, pos_threshold: float = 3.0) -> List[str]:
     """
-    Given a user’s watched movies and ratings, predict ratings for all movies and return top recommendations.
+    Cold-start recommendation for an ad-hoc user who supplies "movieId:rating" pairs.
+    We build a pseudo "user embedding" by averaging the learned movie embeddings
+    of positively rated movies (> pos_threshold). Then recommend by similarity
+    (dot product) against all movie embeddings. Excludes seen movies.
     """
-    input_pairs = [pair.split(":") for pair in input_ratings.split(",")]
-    input_pairs = [(int(movie), float(rating)) for movie, rating in input_pairs]
+    if recommend_model == 'bpr':
+        model_path = "models/trained_model_bpr.pth"
+    elif recommend_model == 'bce':
+        model_path = "models/trained_model_bce.pth"
+    else:
+        raise ValueError("Not a valid model option")
 
-    # Convert movie IDs to indexes
-    movie_indexes = [movie_to_index[movie] for movie, _ in input_pairs if movie in movie_to_index]
-    movie_ratings = torch.tensor([rating for _, rating in input_pairs], dtype=torch.float32)
+    if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.eval()
+    # Parse input "movieId:rating" pairs
+    input_pairs = []
+    for pair in input_ratings.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        m, r = pair.split(":")
+        input_pairs.append((int(m), float(r)))
 
-    # Ensure there are valid movies
-    if not movie_indexes:
-        print("No valid movies found in input!")
+    # Filter positives (rating > threshold)
+    pos_movie_ids = [m for (m, r) in input_pairs if r > pos_threshold]
+    seen_movie_ids = {m for (m, _) in input_pairs}
+
+    # Map to indices, drop unknowns
+    pos_idxs = [ _safe_movie_index(m) for m in pos_movie_ids ]
+    pos_idxs = [ idx for idx in pos_idxs if idx is not None ]
+
+    if not pos_idxs:
+        print("No valid positive movies found in input! Provide at least one rating > threshold.")
         return []
 
-    # Extract the learned movie embeddings from the model
-    movie_embeddings = model.movie_embedding.weight[movie_indexes]
+    with torch.no_grad():
+        movie_emb = model.movie_embedding.weight  # [num_movies, E]
+        # Build pseudo user embedding as mean of positive movie embeddings
+        u = movie_emb[pos_idxs].mean(dim=0)       # [E]
+        scores = (movie_emb @ u)                  # [num_movies]
 
-    # Aggregate the embeddings (e.g., weighted average by ratings)
-    user_embedding = torch.sum(movie_embeddings * movie_ratings.view(-1, 1), dim=0) / torch.sum(movie_ratings)
+        # Exclude seen
+        seen_idxs = set(idx for idx in [ _safe_movie_index(m) for m in seen_movie_ids ] if idx is not None)
+        scores_list = scores.numpy()
+        # set seen to very low score
+        for idx in seen_idxs:
+            scores_list[idx] = -1e9
 
-    # Predict scores for all movies
-    all_movie_ids = list(movie_to_index.values())
-    all_movie_embeddings = model.movie_embedding.weight[all_movie_ids]
+        top_idx = torch.tensor(scores_list).topk(top_n).indices.tolist()
 
-    scores = torch.matmul(all_movie_embeddings, user_embedding)
+    # Map indices back to titles via inverse index -> row lookup:
+    # The original code indexed movies via iloc[idx]; here we must invert movie_to_index.
+    # Build inverse map: index -> movieId
+    inv_movie_index = {v: k for k, v in movie_to_index.items()}
+    rec_titles = []
+    for idx in top_idx:
+        movie_id = inv_movie_index[idx]
+        # find row in movies DataFrame where movieId == movie_id
+        title_row = movies.loc[movies["movieId"] == movie_id]
+        if len(title_row) > 0:
+            rec_titles.append(title_row.iloc[0]["title"])
+        else:
+            rec_titles.append(f"movieId {movie_id}")
 
-    # Get top N recommended movies
-    topN_indices = torch.argsort(scores, descending=True)[:top_n]
-    recommended_movies = [movies.iloc[idx]["title"] for idx in topN_indices.numpy()]
-
-    return recommended_movies
+    return rec_titles

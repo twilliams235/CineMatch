@@ -1,10 +1,14 @@
 import pandas as pd
+import numpy as np
 
 # Define dataset path
 DATASET_PATH = "/Users/tylerwilliams/.cache/kagglehub/datasets/grouplens/movielens-20m-dataset/versions/1"
 
-def load_data():
-    """Loads and preprocesses the MovieLens dataset."""
+def load_data(threshold: float = 3.0):
+    """
+    Loads and preprocesses the MovieLens dataset.
+    Adds an implicit label: 1 if rating > threshold else 0.
+    """
     ratings = pd.read_csv(f"{DATASET_PATH}/rating.csv")
     movies = pd.read_csv(f"{DATASET_PATH}/movie.csv")
 
@@ -17,5 +21,8 @@ def load_data():
 
     ratings["user_index"] = ratings["userId"].map(user_to_index)
     ratings["movie_index"] = ratings["movieId"].map(movie_to_index)
+
+    # implicit label for NCF BCE (positives: rating > threshold)
+    ratings["implicit"] = (ratings["rating"] > threshold).astype(np.int32)
 
     return ratings, movies, user_to_index, movie_to_index
